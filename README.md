@@ -1,2 +1,0 @@
-# moodify
-Moodify ML project
