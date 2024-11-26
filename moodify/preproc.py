@@ -21,8 +21,6 @@ def clean_data(df):
     # RESULT = 429437 lignes
     return df
 
-###comm test
-
 
 def preproc_features(df: pd.DataFrame):
     # remove 'speechiness', 'id', 'lyrics', 'is_english', 'genres_list', 'popularity',
