@@ -15,6 +15,19 @@ def clean_data(df):
     # Spotify data missing (zero =  missing)
     df  = df[df['energy'] != 0] # 438k
 
+    # drop NaN (2% sur chaque features
+    df.dropna(subset=['danceability',
+        'energy',
+        'key',
+        'loudness',
+        'mode',
+        'acousticness',
+        'instrumentalness',
+        'valence',
+        'tempo',
+        'time_signature'
+        ], inplace=True)
+
     # RESULT = 438708 lignes
     return df
 
@@ -35,8 +48,7 @@ def preproc_features(df: pd.DataFrame):
         'time_signature'
         ]]
 
-    # drop NaN (2% sur chaque features)
-    X = X.dropna()
+
 
     # Standard scaler = tempo
     # Robust Scaler = loudness
