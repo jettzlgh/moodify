@@ -42,3 +42,7 @@ uvicorn
 # tests
 httpx
 pytest-asyncio
+
+
+transformers
+torch
