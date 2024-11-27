@@ -28,7 +28,8 @@ def clean_data(df):
         'time_signature'
         ], inplace=True)
 
-    # RESULT = 438708 lignes
+    df.reset_index(inplace=True)
+    # RESULT = 429 437 lignes
     return df
 
 
@@ -47,7 +48,6 @@ def preproc_features(df: pd.DataFrame):
         'tempo',
         'time_signature'
         ]]
-
 
 
     # Standard scaler = tempo
@@ -82,6 +82,7 @@ def preproc_features(df: pd.DataFrame):
     # Conversion en DataFrame
     X_scaled_df = pd.DataFrame(X_scaled, columns=final_columns)
 
+    #429 437 lignes
     return X_scaled_df
 
 
