@@ -4,13 +4,17 @@ from sklearn.preprocessing import RobustScaler, StandardScaler, MinMaxScaler, On
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
+######################## PREPROC AUDIO FEATURES ########################
+
+
 def clean_data(df):
     # Remove duplicates
     df.drop_duplicates(inplace=True)
 
     # Word count filter
-    df['word_count'] = df['lyrics'].apply(lambda x: len(x.split()))
-    df = df[(df['word_count'] < 550) & (df['word_count'] > 40)]
+    if 'lyrics' in df.keys():
+        df['word_count'] = df['lyrics'].apply(lambda x: len(x.split()))
+        df = df[(df['word_count'] < 550) & (df['word_count'] > 40)]
 
     # Spotify data missing (zero =  missing)
     df  = df[df['energy'] != 0] # 438k
@@ -201,3 +205,13 @@ def preproc_features_two(df: pd.DataFrame):
     X_scaled_df = pd.DataFrame(X_scaled, columns=columns)
 
     return X_scaled_df
+
+
+############################ PREPROC LYRICS ############################
+
+def preproc_lyrics(df):
+    return "thomas"
+
+
+def preproc_lyrics_bert(df):
+    return "milene"
