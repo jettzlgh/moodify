@@ -4,6 +4,15 @@ from sklearn.preprocessing import RobustScaler, StandardScaler, MinMaxScaler, On
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from transformers import AutoTokenizer, TFAutoModel
+import string
+from nltk.tokenize import word_tokenize
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from tqdm import tqdm
+from nltk import sent_tokenize, word_tokenize
+import nltk
+nltk.download('punkt_tab')
+
 
 
 ######################## PREPROC AUDIO FEATURES ########################
@@ -212,7 +221,44 @@ def preproc_features_two(df: pd.DataFrame):
 ############################ PREPROC LYRICS ############################
 
 def preproc_lyrics(df):
-    return "thomas"
+    def cleaning(sentence):
+        sentence = sentence.strip()
+        sentence = sentence.lower()
+        sentence = ''.join(char for char in sentence if not char.isdigit())
+
+        # Advanced cleaning
+        for punctuation in string.punctuation:
+            sentence = sentence.replace(punctuation, '')
+
+        tokenized_sentence = word_tokenize(sentence)
+        stop_words = set(stopwords.words('english'))
+
+        tokenized_sentence_cleaned = [
+            w for w in tokenized_sentence if not w in stop_words
+        ]
+
+        lemmatized = [
+            WordNetLemmatizer().lemmatize(word, pos="v")
+            for word in tokenized_sentence_cleaned
+        ]
+
+        cleaned_sentence = ' '.join(word for word in lemmatized)
+        return cleaned_sentence
+
+    def cleaning_batch(df):
+      # Initialize new column for cleaned lyrics
+      df['cleaned_lyrics'] = ''
+
+      # Process each row with progress bar
+      for i in tqdm(range(len(df))):
+          df.at[i, 'cleaned_lyrics'] = cleaning(df.at[i, 'lyrics'])
+
+      return df
+
+    # Usage
+    cleaned_df = cleaning_batch(df)
+    final_df = cleaned_df[['id', 'label', 'cleaned_lyrics']]
+    return final_df
 
 
 def preproc_lyrics_bert(df):
