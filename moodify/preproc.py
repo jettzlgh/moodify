@@ -3,6 +3,8 @@ import numpy as np
 from sklearn.preprocessing import RobustScaler, StandardScaler, MinMaxScaler, OneHotEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
+from transformers import AutoTokenizer, TFAutoModel
+
 
 ######################## PREPROC AUDIO FEATURES ########################
 
@@ -214,4 +216,20 @@ def preproc_lyrics(df):
 
 
 def preproc_lyrics_bert(df):
-    return "milene"
+    # Initiate model & tokenizer
+    model = TFAutoModel.from_pretrained("prajjwal1/bert-tiny", from_pt=True)
+    tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
+
+    # Tokenization w/ padding & max length
+    tokens = tokenizer(df["lyrics"].tolist(), return_tensors='tf', padding=True, truncation=True, max_length=512)
+
+    # get CLS vectors
+    outputs = model(tokens["input_ids"])
+    last_hidden_state = outputs.last_hidden_state
+    cls_vectors = last_hidden_state[:, 0, :]
+
+    # New DF w/ id & 128 dim of CLS
+    df_bert = pd.DataFrame(cls_vectors.numpy(), columns=[str(i) for i in range(1, 129)])
+    df_bert["id"] = df["id"].values
+
+    return df_bert
