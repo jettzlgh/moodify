@@ -1,41 +1,16 @@
 import pandas as pd
 import numpy as np
 
+# Modelling
+import tensorflow as tf
+
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, GRU, Dense
 
+# Tokenizers
+from tensorflow.keras.preprocessing.text import Tokenizer
 
-def input_target_rnn(X_token, word_bucket):
-    '''
-    Transforms the preproc X_token into the model input and target.
-    Note: at the end of the song, the last words are dropped as there is no target
-
-    Returns: X and y for the function model_rnn, as np.arrays
-
-    Parameters:
-    - word_bucket: Length of the input sequences (max length of each sentence)
-
-    '''
-    inputs, targets = [], []
-    # Take a list of lists of tokens (each one song lyrics)
-
-    for song in X_token:
-        # Convert sentence to a NumPy array for efficient slicing
-        song_array = np.array(song)
-
-        # Create the input-target pairs by shuffling
-        for i in range(len(song) - word_bucket):
-            inputs.append(song_array[i:i + word_bucket])
-            targets.append(song_array[i + word_bucket])
-
-    # Make sure that input and targte are NumPy arrays
-    inputs = np.array(inputs)
-    targets = np.array(targets)
-
-    return inputs, targets
-
-
-def model_rnn(X, y, vocab_size, embedding_dim, word_bucket):
+def set_model_rnn(X, y, tokenizer, word_bucket, embedding_dim = 32, gru_layer =64, dense_layer=64):
     '''
     Returns:
         - A compiled RNN model ready to be fitted.
@@ -48,11 +23,16 @@ def model_rnn(X, y, vocab_size, embedding_dim, word_bucket):
     - with an adam optimizer
 
     Parameters:
-    - X_token: a list of songs, each with tokenized words
-    - vocab_size: Number of unique words in your vocab
-    - embedding_dim:  Dimensionality of the word embeddings
+    - X: inputs, tokenizes
+    - y: model targets
+    - tokenizer: tokenizer used
     - word_bucket: Length of the input sequences (max length of each sentence)
+    - embedding_dim:  Dimensionality of the word embeddings
+    - gru_layer: number of GRU neurons
+    - dense_layer: number of neurons in the dense layers
     '''
+    # Get the vocab size
+    vocab_size = len(tokenizer.word_index) + 1
 
     # Start the model
     model = Sequential()
@@ -64,28 +44,36 @@ def model_rnn(X, y, vocab_size, embedding_dim, word_bucket):
                     input_length=word_bucket))
 
     # GRU layer
-    model.add(GRU(64, return_sequences=False))
-    # NOTE: Do i need to return sequences?
+    model.add(GRU(gru_layer, return_sequences=False))
 
     # Dense layer (hidden layer)
-    model.add(Dense(64, activation='relu'))
+    model.add(Dense(dense_layer, activation='relu'))
 
-    # Output layer (softmax activation for multi-class classification)
+    # Output layer
     model.add(Dense(vocab_size, activation='softmax'))
 
     # NOTE: does the output need to be vocab_size + 1?
 
     # Compile the model
-    model.compile(loss='sparse_categorical_crossentropy',  # For multi-class classification
+
+    model.compile(loss='sparse_categorical_crossentropy',
               optimizer='adam',
               metrics=['accuracy'])
 
-    print(model.summary())
+    total_params = sum([tf.reduce_prod(tf.shape(w)) for layer in model.layers for w in layer.get_weights()])
+
+    print(f"Total number of trainable parameters: {total_params}")
 
     return model
 
 
-def scrolling_prediction(model, tokenizer, seed_text, max_length, num_predictions=100):
+# def fit_model_rnn(model, X, mood):
+#     model.fit(X)
+#     return
+
+
+
+def scrolling_prediction(model, tokenizer, seed_text, word_bucket, num_predictions=100):
     """
     Generate a sequence of words using a trained model and tokenizer.
 
@@ -96,7 +84,7 @@ def scrolling_prediction(model, tokenizer, seed_text, max_length, num_prediction
     - model: Trained word prediction model.
     - tokenizer: Tokenizer used during training.
     - seed_text: List of initial words to start the prediction (e.g., ['i', 'was', 'in']).
-    - max_length: The number of words the model expects as input (e.g., 3 for this RNN).
+    - word_bucket: The number of words the model expects as input (e.g., 3 for this RNN).
     - num_predictions: Number of words to predict.
     """
 
@@ -104,18 +92,18 @@ def scrolling_prediction(model, tokenizer, seed_text, max_length, num_prediction
     input_sequence = tokenizer.texts_to_sequences([seed_text])[0]
 
     # Ensure input_sequence is the right length by padding or truncating
-    if len(input_sequence) < max_length:
-        input_sequence = [0] * (max_length - len(input_sequence)) + input_sequence
+    if len(input_sequence) < word_bucket:
+        input_sequence = [0] * (word_bucket - len(input_sequence)) + input_sequence
     else:
-        input_sequence = input_sequence[-max_length:]
+        input_sequence = input_sequence[-word_bucket:]
 
     # Initialize the generated text
     full_generated_text = seed_text[:]
 
     # Generate words iteratively
     for _ in range(num_predictions):
-        # Reshape input_sequence for the model (1, max_length)
-        input_array = np.array(input_sequence).reshape(1, max_length)
+        # Reshape input_sequence for the model (1, word_bucket)
+        input_array = np.array(input_sequence).reshape(1, word_bucket)
 
         # Predict the next word (output probabilities)
         predictions = model.predict(input_array, verbose=0)
@@ -135,6 +123,6 @@ def scrolling_prediction(model, tokenizer, seed_text, max_length, num_prediction
 
         # Update the input_sequence to include the new word
         input_sequence.append(predicted_word_index)
-        input_sequence = input_sequence[-max_length:]  # Keep only the last max_length tokens
+        input_sequence = input_sequence[-word_bucket:]  # Keep only the last max_length tokens
 
     return full_generated_text  # Join words into a sentence
