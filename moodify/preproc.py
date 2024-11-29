@@ -12,7 +12,7 @@ from tqdm import tqdm
 from nltk import sent_tokenize, word_tokenize
 import nltk
 nltk.download('punkt_tab')
-
+from tensorflow.keras.preprocessing.text import Tokenizer
 
 
 ######################## PREPROC AUDIO FEATURES ########################
@@ -262,6 +262,79 @@ def preproc_lyrics(df):
 
 
 def preproc_lyrics_bert(df):
+    # Initiate model & tokenizer
+    model = TFAutoModel.from_pretrained("prajjwal1/bert-tiny", from_pt=True)
+    tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
+
+    # Tokenization w/ padding & max length
+    tokens = tokenizer(df["lyrics"].tolist(), return_tensors='tf', padding=True, truncation=True, max_length=512)
+
+    # get CLS vectors
+    outputs = model(tokens["input_ids"])
+    last_hidden_state = outputs.last_hidden_state
+    cls_vectors = last_hidden_state[:, 0, :]
+
+    # New DF w/ id & 128 dim of CLS
+    df_bert = pd.DataFrame(cls_vectors.numpy(), columns=[str(i) for i in range(1, 129)])
+    df_bert["id"] = df["id"].values
+
+    return df_bert
+
+#--------------------------------- RNN ----------------------------------#
+
+def mood_filter(df,cluster):
+    df_mood = df[df['label']==cluster]
+    return df_mood
+
+
+def preproc_rnn(df, word_bucket):
+    def cleaning(sentence):
+        sentence = sentence.strip()
+        sentence = sentence.lower()
+        sentence = ''.join(char for char in sentence if not char.isdigit())
+
+        # Advanced cleaning
+        for punctuation in string.punctuation:
+            sentence = sentence.replace(punctuation, '')
+
+        return sentence
+
+    corpus = df['lyrics'].astype(str).apply(cleaning)
+
+    # Étape 2 : Initialiser et ajuster le Tokenizer
+    tokenizer = Tokenizer()
+    tokenizer.fit_on_texts(corpus)
+
+    # Étape 3 : Tokeniser les lyrics
+    X_token = tokenizer.texts_to_sequences(corpus)
+
+    def input_target_rnn(X_token, word_bucket):
+        '''
+        Transforms the preproc X_token into the model input and target.
+        Note: at the end of the song, the last words are dropped as there is no target
+        Returns: X and y for the function model_rnn, as np.arrays
+        Parameters:
+        - word_bucket: Length of the input sequences (max length of each sentence)
+        '''
+        inputs, targets = [], []
+        # Take a list of lists of tokens (each one song lyrics)
+        for song in X_token:
+            # Convert sentence to a NumPy array for efficient slicing
+            song_array = np.array(song)
+            # Create the input-target pairs by shuffling
+            for i in range(len(song) - word_bucket):
+                inputs.append(song_array[i:i + word_bucket])
+                targets.append(song_array[i + word_bucket])
+        # Make sure that input and target are NumPy arrays
+        inputs = np.array(inputs)
+        targets = np.array(targets)
+        return inputs, targets
+
+    inputs, targets = input_target_rnn(X_token, word_bucket)
+    return inputs, targets, tokenizer
+
+
+def preproc_rnn_bert(df):
     # Initiate model & tokenizer
     model = TFAutoModel.from_pretrained("prajjwal1/bert-tiny", from_pt=True)
     tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
