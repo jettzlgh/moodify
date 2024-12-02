@@ -43,4 +43,10 @@ httpx
 pytest-asyncio
 accelerate>=0.26.0
 transformers
+
 outetts
+
+torch
+
+nltk==3.9.1
+
