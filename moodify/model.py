@@ -3,6 +3,7 @@ import numpy as np
 
 # Modelling
 import tensorflow as tf
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, GRU, Dense
@@ -72,13 +73,38 @@ def set_model_rnn(X, y, tokenizer, word_bucket, embedding_dim = 32, gru_layer =6
 #     return
 
 
+def fit_model_rnn(model, X, y, epochs=10, patience = 10, batch_size=32):
+    early_stopping = EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+
+    # Fit the model with early stopping and model checkpoint
+    history = model.fit(X, y, epochs=epochs,
+                validation_split=0.3,
+                batch_size = batch_size,
+                shuffle = True,
+                callbacks=[early_stopping])
+    return model, history
+
+
+def fit_model_rnn_with_checkpoint(model, X, y, epochs=10, patience = 10, batch_size=32, save_path="model.h5"):
+    early_stopping = EarlyStopping(monitor='val_loss', patience=patience, restore_best_weights=True)
+    checkpoint = ModelCheckpoint(save_path, save_best_only=True, monitor='val_loss', mode='min')
+
+    # Fit the model with early stopping and model checkpoint
+    history = model.fit(X, y, epochs=epochs,
+                validation_split=0.3,
+                batch_size = batch_size,
+                shuffle = True,
+                callbacks=[checkpoint, early_stopping])
+    return model, history
+
+
 
 def scrolling_prediction(model, tokenizer, seed_text, word_bucket, num_predictions=100):
     """
     Generate a sequence of words using a trained model and tokenizer.
 
     Returns:
-    - full_generated_text: The complete predicted text as a list of words.
+    - full_generated_text: The complete predicted text as a string.
 
     Parameters:
     - model: Trained word prediction model.
@@ -87,42 +113,45 @@ def scrolling_prediction(model, tokenizer, seed_text, word_bucket, num_predictio
     - word_bucket: The number of words the model expects as input (e.g., 3 for this RNN).
     - num_predictions: Number of words to predict.
     """
-
     # Convert seed_text to tokens
-    input_sequence = tokenizer.texts_to_sequences([seed_text])[0]
+    seed_token = tokenizer.texts_to_sequences([seed_text])[0]  # Convert to token list
 
-    # Ensure input_sequence is the right length by padding or truncating
-    if len(input_sequence) < word_bucket:
-        input_sequence = [0] * (word_bucket - len(input_sequence)) + input_sequence
+    # Ensure the seed_token length matches the word_bucket size
+    if len(seed_token) < word_bucket:
+        # Pad with zeros at the beginning if too short
+        seed_token = [0] * (word_bucket - len(seed_token)) + seed_token
     else:
-        input_sequence = input_sequence[-word_bucket:]
+        # Truncate to the most recent `word_bucket` tokens if too long
+        seed_token = seed_token[-word_bucket:]
 
-    # Initialize the generated text
-    full_generated_text = seed_text[:]
+    # Initialize generated text and tokens
+    generated_text = seed_text
+    generated_tokens = np.array(seed_token).reshape(1, word_bucket)  # Shape: (1, word_bucket)
 
-    # Generate words iteratively
+    # Generate the predicted words for the desired length
     for _ in range(num_predictions):
-        # Reshape input_sequence for the model (1, word_bucket)
-        input_array = np.array(input_sequence).reshape(1, word_bucket)
-
-        # Predict the next word (output probabilities)
-        predictions = model.predict(input_array, verbose=0)
+        # Use the last `word_bucket` tokens as input
+        input_tokens = generated_tokens[:, -word_bucket:]  # Shape: (1, word_bucket)
+        
+        # Predict the next word probabilities
+        prediction = model.predict(input_tokens, verbose=0)
 
         # Choose the word with the highest probability
-        predicted_word_index = np.argmax(predictions, axis=-1)[0]
+        predicted_word_index = np.argmax(prediction, axis=-1)[0]
 
         # Convert the predicted index back to a word
         predicted_word = tokenizer.index_word.get(predicted_word_index, '')
 
-        # Stop if no valid prediction
+        # If no valid word is found, skip the prediction
         if not predicted_word:
+            print("Unknown word index:", predicted_word_index)
             break
 
         # Append the predicted word to the full text
-        full_generated_text += " " + predicted_word
+        generated_text += " " + predicted_word
 
-        # Update the input_sequence to include the new word
-        input_sequence.append(predicted_word_index)
-        input_sequence = input_sequence[-word_bucket:]  # Keep only the last max_length tokens
+        # Update the input tokens to include the new word
+        predicted_word_array = np.array([[predicted_word_index]])  # Shape: (1, 1)
+        generated_tokens = np.append(generated_tokens, predicted_word_array, axis=1)
 
-    return full_generated_text  # Join words into a sentence
+    return generated_text

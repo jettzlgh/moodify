@@ -46,3 +46,5 @@ pytest-asyncio
 
 transformers
 torch
+
+nltk==3.9.1
