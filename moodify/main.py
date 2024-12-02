@@ -71,8 +71,10 @@ def model_train(model_type, class_code, model_target):
 
     # Create a unique model name with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    model_filename = f"{model_type}_{class_code}_{timestamp}_model.pkl"
+
+    model_filename = f"{model_type}_{class_code}_{timestamp}_model"
     tokenizer_filename = f"{model_type}_{class_code}_{timestamp}_tokenizer.pkl"
+    history_filename = f"{model_type}_{class_code}_{timestamp}_history.pkl"
 
     # Save a copy of the model where you are
     # NOTE: does this need to be optimized for the VC?
@@ -87,10 +89,14 @@ def model_train(model_type, class_code, model_target):
 
     # Save the tokenizer as a pickle
     with open(tokenizer_path, 'wb') as file:
-        pickle.dump(tokenizer, file)  # Assuming `model` is your trained model object
+        pickle.dump(tokenizer, file)
+
+    # Save the model history
+    with open(history_filename, 'wb') as file:
+        pickle.dump(history, file)
 
     if model_target == "gcs":
-        
+
         # Initialize GCP client
         client = storage.Client()  # Access GCP
         bucket = client.bucket(BUCKET_NAME)  # Replace with your GCP bucket name
@@ -98,15 +104,18 @@ def model_train(model_type, class_code, model_target):
         # Define the blob (path inside the bucket where the model will be stored)
         model_blob = bucket.blob(f"models/{model_filename}")  # Save inside the 'models' folder
         tokenizer_blob = bucket.blob(f"models/{tokenizer_filename}")
+        history_blob = bucket.blob(f"models/{history_filename}")
 
         # Upload the pickle file to the GCP bucket
         model_blob.upload_from_filename(model_path)  # Upload the file to the bucket
         tokenizer_blob.upload_from_filename(tokenizer_path)
+        history_blob.upload_from_filename(history_filename)
 
         # Delete the local model file after upload (remove from the VM)
         # NOTE: Is this step needed?
         os.remove(model_path)
         os.remove(tokenizer_path)
+        os.remove(history_blob)
 
         print(f"✅Model and tokeniser saved to GCP bucket")
 
