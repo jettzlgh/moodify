@@ -7,11 +7,12 @@ import sys
 
 from datetime import datetime
 import warnings
+import time
 
 from moodify.preproc import preproc_rnn, preproc_rnn_bert, mood_filter
 from moodify.model import set_model_rnn, fit_model_rnn, set_model_bert, scrolling_prediction, scrolling_prediction_bert
 
-def model_train(model_type, class_code, model_target, word_bucket):
+def model_train(model_type, class_code, model_target, word_bucket, run_type='full'):
     """
     NOTE: ideal would be to loop over the class codes
 
@@ -21,10 +22,19 @@ def model_train(model_type, class_code, model_target, word_bucket):
     - Train the model
     - Store model in model bucket
     """
+    if run_type == 'test':
+        data_blob_name = 'lyrics_with_labels_50_songs.csv'
+        epochs = 5
+    else:
+        data_blob_name = DATA_BLOB_NAME
+        epochs = EPOCHS
+
+    # Record the start time
+    start_time = time.time()
 
     # Get the raw data from the moodify bucket ###############
 
-    gcs_path = f'gs://{BUCKET_NAME}/{DATA_BLOB_NAME}'
+    gcs_path = f'gs://{BUCKET_NAME}/{data_blob_name}'
     print('Loading data from the following bucket:',gcs_path)
     df = pd.read_csv(gcs_path)
 
@@ -51,6 +61,7 @@ def model_train(model_type, class_code, model_target, word_bucket):
 
     # END
     print("✅ preprocessing done \n")
+    end_time_preproc = time.time()
 
     # Train model ###################################
 
@@ -63,7 +74,7 @@ def model_train(model_type, class_code, model_target, word_bucket):
         # end
         print(f'training BERT model for class {class_code}')
 
-        model, history = fit_model_rnn(model, inputs, targets, epochs=EPOCHS, patience = PATIENCE, batch_size=BATCH_SIZE)
+        model, history = fit_model_rnn(model, inputs, targets, epochs=epochs, patience = PATIENCE, batch_size=BATCH_SIZE)
 
 
     if model_type == "rnn":
@@ -76,10 +87,10 @@ def model_train(model_type, class_code, model_target, word_bucket):
                   gru_layer = GRU_LAYER,
                   dense_layer = DENSE_LAYER)
 
-        model, history = fit_model_rnn(model, inputs, targets, epochs=EPOCHS, patience = PATIENCE, batch_size=BATCH_SIZE)
+        model, history = fit_model_rnn(model, inputs, targets, epochs=epochs, patience = PATIENCE, batch_size=BATCH_SIZE)
 
         print(f'✅ finished training RNN model \n')
-
+    end_time_train = time.time()
 
 
     # Save model and tokenizer ####################################
@@ -149,11 +160,22 @@ def model_train(model_type, class_code, model_target, word_bucket):
 
         print(f"✅ Files saved locally ")
 
-    print('Run complete:')
+    end_time_save = time.time()
+
+    print('✅ Run complete: ')
     print(f'model: {model_type}')
     print(f'version: {timestamp}')
     print(f'class : {class_code}')
-    print(f'word bucket: {word_bucket}')
+    print(f'word bucket: {word_bucket} \n')
+
+    elapsed_time = end_time_save - start_time
+    elapsed_preproc = end_time_preproc - start_time
+    elapsed_train = end_time_train - end_time_preproc
+    elapsed_save = end_time_save - end_time_train
+
+    print(f'Time taken: {elapsed_time:.2f} (preproc: {elapsed_preproc:.2f}, train: {elapsed_train:.2f}, save: {elapsed_save:.2f}) ')
+
+
     return None
 
 if __name__ == "__main__":
@@ -161,5 +183,6 @@ if __name__ == "__main__":
   class_code = int(sys.argv[2])
   model_target = str(sys.argv[3])
   word_bucket = int(sys.argv[4])
+  run_type = str(sys.argv[5])
 
   model_train(model_type, class_code, model_target, word_bucket)
