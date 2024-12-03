@@ -376,28 +376,3 @@ def preproc_rnn_bert(df, word_bucket):
     inputs, targets = input_target_rnn(last_hidden_state, word_bucket)
 
     return inputs, targets, tokenizer
-
-
-# def decode_bert(inputs, targets, predictions):
-    model = TFAutoModel.from_pretrained("prajjwal1/bert-tiny", from_pt=True)
-    tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
-
-    for x in inputs:
-        decode = tokenizer.decode(x)
-        print(decode)
-
-    # decoder_layer = tf.keras.layers.Dense(tokenizer.vocab_size, activation='softmax')
-
-    # predictions_targets = decoder_layer(targets)
-
-    # predicted_tokens = tf.argmax(predictions_targets, axis=-1)
-
-    # decoded_predictions = [
-    # tokenizer.decode(seq, skip_special_tokens=True) for seq in predicted_tokens.numpy()
-    # ]
-
-    return decoded_predictions
-
-    # mask_token_index = (inputs.input_ids == tokenizer.mask_token_id)[0].nonzero(as_tuple=True)[0]
-
-    # predicted_token_id = targets[0, mask_token_index].argmax(axis=-1)

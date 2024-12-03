@@ -7,7 +7,7 @@ from moodify.params import *
 from datetime import datetime
 
 from moodify.preproc import preproc_rnn, preproc_rnn_bert, mood_filter
-from moodify.model import set_model_rnn, fit_model_rnn
+from moodify.model import set_model_rnn, fit_model_rnn, set_model_bert, scrolling_prediction, scrolling_prediction_bert
 
 def model_train(model_type, class_code, model_target, word_bucket):
     """
@@ -21,22 +21,25 @@ def model_train(model_type, class_code, model_target, word_bucket):
     """
 
     # Get the raw data from the moodify bucket ###############
+
     gcs_path = f'gs://{BUCKET_NAME}/{DATA_BLOB_NAME}'
     print('Loading data from the following bucket:',gcs_path)
     df = pd.read_csv(gcs_path)
 
     print("✅ accessed df on bucket \n")
 
+    # Keep only the select class
+    df = mood_filter(df,cluster=class_code)
+
     # Preprocess data ##############################
 
     if model_type == 'bert':
         # start
-
+        inputs, targets, tokenizer = preproc_rnn_bert(df,word_bucket)
         # end
         print('prerocessing for BERT model')
     elif model_type == 'rnn':
         #start
-        df = mood_filter(df,cluster=class_code) # Keep only the select class
         inputs, targets, tokenizer = preproc_rnn(df, word_bucket) #
         #end
         print('preprocessing for RNN model')
@@ -51,9 +54,15 @@ def model_train(model_type, class_code, model_target, word_bucket):
 
     if model_type == "bert":
         # start
-
+        model = set_model_bert(X= inputs, y = targets, tokenizer = tokenizer,
+                  word_bucket = word_bucket,
+                  gru_layer = GRU_LAYER,
+                  dense_layer = DENSE_LAYER)
         # end
         print(f'training BERT model for class {class_code}')
+
+        model, history = fit_model_rnn(model, inputs, targets, epochs=EPOCHS, patience = PATIENCE, batch_size=BATCH_SIZE)
+
 
     if model_type == "rnn":
 
