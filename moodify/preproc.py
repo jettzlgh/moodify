@@ -341,10 +341,14 @@ def preproc_rnn_bert(df, word_bucket):
     tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
 
     # Tokenization w/ padding & max length
-    tokens = tokenizer(df["lyrics"].tolist(), return_tensors='tf', padding=True, truncation=True, max_length=512)
+    if type(df) == str:
+        tokens = tokenizer(df, return_tensors='tf', padding=True, truncation=True, max_length=512)
+    else:
+        tokens = tokenizer(df["lyrics"].tolist(), return_tensors='tf', padding=True, truncation=True, max_length=512)
 
     # get vectors for all tokens
     outputs = model(tokens["input_ids"])
+    #print("coucou", outputs)
     last_hidden_state = outputs.last_hidden_state # tensor de (10, 512, 128)
 
     def input_target_rnn(last_hidden_state, word_bucket):
@@ -374,8 +378,7 @@ def preproc_rnn_bert(df, word_bucket):
     return inputs, targets, tokenizer
 
 
-
-def decode_bert(inputs, targets, predictions):
+# def decode_bert(inputs, targets, predictions):
     model = TFAutoModel.from_pretrained("prajjwal1/bert-tiny", from_pt=True)
     tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
 
