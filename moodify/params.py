@@ -4,7 +4,7 @@ import numpy as np
 ## Params to train on GCP #####
 GCP_PROJECT = 'moodifyproject'
 BUCKET_NAME = 'moodify_bucket'
-DATA_BLOB_NAME = 'lyrics_with_labels.csv' #'lyrics_with_labels_50_songs.csv'
+DATA_BLOB_NAME = 'lyrics_with_labels.csv'
 
 # Model params
 BATCH_SIZE = 32

@@ -25,6 +25,7 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type='ful
     if run_type == 'test':
         data_blob_name = 'lyrics_with_labels_50_songs.csv'
         epochs = 5
+        
     else:
         data_blob_name = DATA_BLOB_NAME
         epochs = EPOCHS
