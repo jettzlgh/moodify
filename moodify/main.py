@@ -3,6 +3,7 @@ from google.cloud import storage
 import pandas as pd
 import pickle
 from moodify.params import *
+import sys
 
 from datetime import datetime
 
@@ -87,9 +88,9 @@ def model_train(model_type, class_code, model_target, word_bucket):
     # Create a unique model name with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    model_filename = f"{model_type}_{class_code}_{timestamp}_model.pkl"
-    tokenizer_filename = f"{model_type}_{class_code}_{timestamp}_tokenizer.pkl"
-    history_filename = f"{model_type}_{class_code}_{timestamp}_history.pkl"
+    model_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_model.pkl"
+    tokenizer_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_tokenizer.pkl"
+    history_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_history.pkl"
 
     # Save a copy of the model where you are
     # NOTE: does this need to be optimized for the VC?
@@ -147,3 +148,12 @@ def model_train(model_type, class_code, model_target, word_bucket):
         print(f"✅ Tokenizer saved as '{tokenizer_filename}'")
 
     return None
+
+
+if __name__ == "__main__":
+  model_type = sys.argv[1]
+  class_code = sys.argv[2]
+  model_target = sys.argv[3]
+  word_bucket = sys.argv[4]
+
+  model_train(model_type, class_code, model_target, word_bucket)
