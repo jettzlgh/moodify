@@ -100,6 +100,8 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
     # Create a unique model name with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    inputs_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_inputs.pkl"
+    targets_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_targets.pkl"
     model_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_model.pkl"
     tokenizer_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_tokenizer.pkl"
     history_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_history.pkl"
@@ -109,11 +111,21 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
     local_path = os.getcwd()
 
     # Create the save paths
+    inputs_path = os.path.join(local_path, inputs_filename)
+    targets_path = os.path.join(local_path, targets_filename)
     model_path = os.path.join(local_path, model_filename)
     tokenizer_path = os.path.join(local_path, tokenizer_filename)
     history_path = os.path.join(local_path, history_filename)
 
     warnings.filterwarnings("ignore", category=UserWarning, module="absl")
+
+    # Save inputs preprocessed
+    with open(inputs_path, 'wb') as file:
+        pickle.dump(inputs, file)
+
+    # Save targets preprocessed
+    with open(targets_path, 'wb') as file:
+        pickle.dump(targets, file)
 
     # Save as a tensorflow model
     with open(model_path, 'wb') as file:
@@ -127,6 +139,7 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
     with open(history_filename, 'wb') as file:
         pickle.dump(history, file)
 
+
     if model_target == "gcs":
 
         # Initialize GCP client
@@ -136,11 +149,16 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
         print(f'Accessing client at: {client} \n')
 
         # Define the blob (path inside the bucket where the model will be stored)
+        inputs_blob = bucket.blob(f"models/{inputs_filename}")
+        targets_blob = bucket.blob(f"models/{targets_filename}") # Save inside the 'models' folder
+        tokenizer_blob = bucket.blob(f"models/{tokenizer_filename}")
         model_blob = bucket.blob(f"models/{model_filename}")  # Save inside the 'models' folder
         tokenizer_blob = bucket.blob(f"models/{tokenizer_filename}")
         history_blob = bucket.blob(f"models/{history_filename}")
 
         # Upload the pickle file to the GCP bucket
+        inputs_blob.upload_from_filename(inputs_path)
+        targets_blob.upload_from_filename(targets_path)
         model_blob.upload_from_filename(model_path)  # Upload the file to the bucket
         tokenizer_blob.upload_from_filename(tokenizer_path)
         history_blob.upload_from_filename(history_filename)
@@ -148,6 +166,8 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
 
         # Delete the local model file after upload (remove from the VM)
         # NOTE: Is this step needed?
+        os.remove(inputs_path)
+        os.remove(targets_path)
         os.remove(model_path)
         os.remove(tokenizer_path)
         os.remove(history_path)
