@@ -8,7 +8,7 @@ from datetime import datetime
 from moodify.preproc import preproc_rnn, preproc_rnn_bert, mood_filter
 from moodify.model import set_model_rnn, fit_model_rnn
 
-def model_train(model_type, class_code, model_target):
+def model_train(model_type, class_code, model_target, word_bucket):
     """
     NOTE: ideal would be to loop over the class codes
 
@@ -36,7 +36,7 @@ def model_train(model_type, class_code, model_target):
     elif model_type == 'rnn':
         #start
         df = mood_filter(df,cluster=class_code) # Keep only the select class
-        inputs, targets, tokenizer = preproc_rnn(df, WORD_BUCKET) #
+        inputs, targets, tokenizer = preproc_rnn(df, word_bucket) #
         #end
         print('preprocessing for RNN model')
     else:
@@ -56,23 +56,28 @@ def model_train(model_type, class_code, model_target):
 
     if model_type == "rnn":
 
+        print(f'training RNN model for class {class_code}')
+
         model = set_model_rnn(X= inputs, y = targets, tokenizer = tokenizer,
-                  word_bucket = WORD_BUCKET,
+                  word_bucket = word_bucket,
                   embedding_dim = EMBEDDING_DIM,
                   gru_layer = GRU_LAYER,
                   dense_layer = DENSE_LAYER)
 
         model, history = fit_model_rnn(model, inputs, targets, epochs=EPOCHS, patience = PATIENCE, batch_size=BATCH_SIZE)
 
-        print(f'training RNN model for class {class_code}')
+        print(f'✅ finished training RNN model for class {class_code}')
+
 
 
     # Save model and tokenizer ####################################
 
+    print(f'saving training RNN model for class {class_code}')
+
     # Create a unique model name with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    model_filename = f"{model_type}_{class_code}_{timestamp}_model"
+    model_filename = f"{model_type}_{class_code}_{timestamp}_model.pkl"
     tokenizer_filename = f"{model_type}_{class_code}_{timestamp}_tokenizer.pkl"
     history_filename = f"{model_type}_{class_code}_{timestamp}_history.pkl"
 
@@ -83,9 +88,11 @@ def model_train(model_type, class_code, model_target):
     # Create the save paths
     model_path = os.path.join(local_path, model_filename)
     tokenizer_path = os.path.join(local_path, tokenizer_filename)
+    history_path = os.path.join(local_path, history_filename)
 
     # Save as a tensorflow model
-    model.save(model_path, save_format='tf')
+    with open(model_path, 'wb') as file:
+        pickle.dump(model, file)
 
     # Save the tokenizer as a pickle
     with open(tokenizer_path, 'wb') as file:
@@ -99,7 +106,9 @@ def model_train(model_type, class_code, model_target):
 
         # Initialize GCP client
         client = storage.Client()  # Access GCP
+
         bucket = client.bucket(BUCKET_NAME)  # Replace with your GCP bucket name
+        print('Accessing client at:',client)
 
         # Define the blob (path inside the bucket where the model will be stored)
         model_blob = bucket.blob(f"models/{model_filename}")  # Save inside the 'models' folder
@@ -110,14 +119,16 @@ def model_train(model_type, class_code, model_target):
         model_blob.upload_from_filename(model_path)  # Upload the file to the bucket
         tokenizer_blob.upload_from_filename(tokenizer_path)
         history_blob.upload_from_filename(history_filename)
+        print('Finished uploading')
 
         # Delete the local model file after upload (remove from the VM)
         # NOTE: Is this step needed?
         os.remove(model_path)
         os.remove(tokenizer_path)
-        os.remove(history_blob)
+        os.remove(history_path)
+        print('Local files deleted')
 
-        print(f"✅Model and tokeniser saved to GCP bucket")
+        print(f"✅Model, tokeniser and history saved to GCP bucket")
 
 
     if model_target == "local":
