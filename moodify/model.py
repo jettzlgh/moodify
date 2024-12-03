@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from accelerate import disk_offload , init_empty_weights, infer_auto_device_map
+#from accelerate import disk_offload , init_empty_weights, infer_auto_device_map
 
 
 def get_transformers_lyrics():
@@ -300,4 +300,3 @@ def scrolling_prediction_bert(model, tokenizer, seed_text, word_bucket, hidden_d
         # print(input_tokens)
 
     return generated_text
-

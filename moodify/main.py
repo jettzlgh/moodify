@@ -150,9 +150,9 @@ def model_train(model_type, class_code, model_target, word_bucket):
     return None
 
 if __name__ == "__main__":
-  model_type = sys.argv[1]
-  class_code = sys.argv[2]
-  model_target = sys.argv[3]
-  word_bucket = sys.argv[4]
+  model_type = str(sys.argv[1])
+  class_code = int(sys.argv[2])
+  model_target = str(sys.argv[3])
+  word_bucket = int(sys.argv[4])
 
   model_train(model_type, class_code, model_target, word_bucket)
