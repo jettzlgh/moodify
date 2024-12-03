@@ -4,12 +4,12 @@ import numpy as np
 ## Params to train on GCP #####
 GCP_PROJECT = 'moodifyproject'
 BUCKET_NAME = 'moodify_bucket'
-DATA_BLOB_NAME = 'lyrics_with_labels_50_songs.csv'
+DATA_BLOB_NAME = 'lyrics_with_labels.csv'
 
 # Model params
 BATCH_SIZE = 32
 EMBEDDING_DIM = 64
 GRU_LAYER = 64
 DENSE_LAYER = 64
-EPOCHS = 5
+EPOCHS = 200
 PATIENCE = 20
