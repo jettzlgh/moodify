@@ -3,7 +3,6 @@ import numpy as np
 from transformers import AutoModelForCausalLM, AutoTokenizer
 #from accelerate import disk_offload , init_empty_weights, infer_auto_device_map
 
-
 def get_transformers_lyrics():
     model_name = "Qwen/Qwen2.5-1.5B-Instruct"
     # with init_empty_weights():

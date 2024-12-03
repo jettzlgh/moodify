@@ -6,6 +6,7 @@ from moodify.params import *
 import sys
 
 from datetime import datetime
+import warnings
 
 from moodify.preproc import preproc_rnn, preproc_rnn_bert, mood_filter
 from moodify.model import set_model_rnn, fit_model_rnn, set_model_bert, scrolling_prediction, scrolling_prediction_bert
@@ -67,7 +68,7 @@ def model_train(model_type, class_code, model_target, word_bucket):
 
     if model_type == "rnn":
 
-        print(f'training RNN model for class {class_code}')
+        print(f'training RNN model for class {class_code} \n')
 
         model = set_model_rnn(X= inputs, y = targets, tokenizer = tokenizer,
                   word_bucket = word_bucket,
@@ -77,13 +78,13 @@ def model_train(model_type, class_code, model_target, word_bucket):
 
         model, history = fit_model_rnn(model, inputs, targets, epochs=EPOCHS, patience = PATIENCE, batch_size=BATCH_SIZE)
 
-        print(f'✅ finished training RNN model for class {class_code}')
+        print(f'✅ finished training RNN model \n')
 
 
 
     # Save model and tokenizer ####################################
 
-    print(f'saving training RNN model for class {class_code}')
+    print(f'saving training RNN model for class {class_code} \n')
 
     # Create a unique model name with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -100,6 +101,8 @@ def model_train(model_type, class_code, model_target, word_bucket):
     model_path = os.path.join(local_path, model_filename)
     tokenizer_path = os.path.join(local_path, tokenizer_filename)
     history_path = os.path.join(local_path, history_filename)
+
+    warnings.filterwarnings("ignore", category=UserWarning, module="absl")
 
     # Save as a tensorflow model
     with open(model_path, 'wb') as file:
@@ -119,7 +122,7 @@ def model_train(model_type, class_code, model_target, word_bucket):
         client = storage.Client()  # Access GCP
 
         bucket = client.bucket(BUCKET_NAME)  # Replace with your GCP bucket name
-        print('Accessing client at:',client)
+        print(f'Accessing client at: {client} \n')
 
         # Define the blob (path inside the bucket where the model will be stored)
         model_blob = bucket.blob(f"models/{model_filename}")  # Save inside the 'models' folder
@@ -130,23 +133,27 @@ def model_train(model_type, class_code, model_target, word_bucket):
         model_blob.upload_from_filename(model_path)  # Upload the file to the bucket
         tokenizer_blob.upload_from_filename(tokenizer_path)
         history_blob.upload_from_filename(history_filename)
-        print('Finished uploading')
+        print('Finished uploading \n')
 
         # Delete the local model file after upload (remove from the VM)
         # NOTE: Is this step needed?
         os.remove(model_path)
         os.remove(tokenizer_path)
         os.remove(history_path)
-        print('Local files deleted')
+        print('Local files deleted \n')
 
-        print(f"✅Model, tokeniser and history saved to GCP bucket")
+        print(f"✅Model, tokeniser and history saved to GCP bucket \n")
 
 
     if model_target == "local":
 
-        print(f"✅ Model saved locally as '{model_filename}'")
-        print(f"✅ Tokenizer saved as '{tokenizer_filename}'")
+        print(f"✅ Files saved locally ")
 
+    print('Run complete:')
+    print(f'model: {model_type}')
+    print(f'version: {timestamp}')
+    print(f'class : {class_code}')
+    print(f'word bucket: {word_bucket}')
     return None
 
 if __name__ == "__main__":
