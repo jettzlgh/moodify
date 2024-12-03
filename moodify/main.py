@@ -25,10 +25,10 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type='ful
     if run_type == 'test':
         data_blob_name = 'lyrics_with_labels_50_songs.csv'
         epochs = 5
-        
+
     else:
-        data_blob_name = DATA_BLOB_NAME
-        epochs = EPOCHS
+        data_blob_name = 'lyrics_with_labels.csv'
+        epochs = 200
 
     # Record the start time
     start_time = time.time()
@@ -186,4 +186,4 @@ if __name__ == "__main__":
   word_bucket = int(sys.argv[4])
   run_type = str(sys.argv[5])
 
-  model_train(model_type, class_code, model_target, word_bucket)
+  model_train(model_type, class_code, model_target, word_bucket, run_type)
