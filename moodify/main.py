@@ -36,18 +36,21 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
 
 
     #1.  Check if the preproc file is available on GCS
+    # Create a unique model name with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Compile file names
     inputs_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_inputs.npy"
     targets_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_targets.npy"
     tokenizer_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_tokenizer.pkl"
 
+    # # Check if the files are available on GCS
     # try:
     #     gcs_path = f'gs://{BUCKET_NAME}/{data_blob_name}'
     #     print('Loading data from the following bucket:',gcs_path)
-    #     df = pd.read_csv(gcs_path)
+    #     inputs = pd.read_csv(gcs_path)
 
-    # else:
+    # except:
 
     # Get the raw data from the moodify bucket ###############
 
@@ -81,10 +84,6 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
     print("✅ preprocessing done \n")
 
     # Save the preprocessed outputs
-
-    # Create a unique model name with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
 
     # Check you have the correct relative paths
     local_path = os.getcwd()
