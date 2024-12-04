@@ -27,12 +27,27 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
         epochs = 5
         patience = 2
     else:
-        data_blob_name = 'lyrics_with_labels.csv'
-        epochs = 20
+        data_blob_name = 'lyrics_with_labels_val.csv'
+        epochs = 10
         patience = 4
 
     # Record the start time
     start_time = time.time()
+
+
+    #1.  Check if the preproc file is available on GCS
+
+    # Compile file names
+    inputs_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_inputs.npy"
+    targets_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_targets.npy"
+    tokenizer_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_tokenizer.pkl"
+
+    # try:
+    #     gcs_path = f'gs://{BUCKET_NAME}/{data_blob_name}'
+    #     print('Loading data from the following bucket:',gcs_path)
+    #     df = pd.read_csv(gcs_path)
+
+    # else:
 
     # Get the raw data from the moodify bucket ###############
 
@@ -47,7 +62,10 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
 
     # Preprocess data ##############################
 
+
     if model_type == 'bert':
+
+
         inputs, targets, tokenizer = preproc_rnn_bert(df,word_bucket)
 
         print('prerocessing for BERT model')
@@ -67,10 +85,6 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
     # Create a unique model name with timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    # 1. Save local copy
-    inputs_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_inputs.npy"
-    targets_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_targets.npy"
-    tokenizer_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_tokenizer.pkl"
 
     # Check you have the correct relative paths
     local_path = os.getcwd()
