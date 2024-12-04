@@ -10,7 +10,7 @@ import warnings
 import time
 
 from moodify.preproc import preproc_rnn, preproc_rnn_bert, mood_filter
-from moodify.model import set_model_rnn, fit_model_rnn, set_model_bert, scrolling_prediction, scrolling_prediction_bert
+from moodify.model import set_model_rnn, fit_model_rnn, fit_model_rnn_with_checkpoint, set_model_bert, scrolling_prediction, scrolling_prediction_bert
 
 def model_train(model_type, class_code, model_target, word_bucket, run_type):
     """
@@ -25,9 +25,11 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
     if run_type == 'test':
         data_blob_name = 'lyrics_with_labels_50_songs.csv'
         epochs = 5
+        patience = 2
     else:
         data_blob_name = 'lyrics_with_labels.csv'
-        epochs = 200
+        epochs = 20
+        patience = 4
 
     # Record the start time
     start_time = time.time()
@@ -46,40 +48,94 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
     # Preprocess data ##############################
 
     if model_type == 'bert':
-        # start
         inputs, targets, tokenizer = preproc_rnn_bert(df,word_bucket)
-        # end
+
         print('prerocessing for BERT model')
+
     elif model_type == 'rnn':
-        #start
         inputs, targets, tokenizer = preproc_rnn(df, word_bucket) #
-        #end
+
         print('preprocessing for RNN model')
     else:
         print('incompatible model')
         return ValueError
 
-    # END
     print("✅ preprocessing done \n")
+
+    # Save the preprocessed outputs
+
+    # Create a unique model name with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # 1. Save local copy
+    inputs_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_inputs.npy"
+    targets_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_targets.npy"
+    tokenizer_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_tokenizer.pkl"
+
+    # Check you have the correct relative paths
+    local_path = os.getcwd()
+    inputs_path = os.path.join(local_path, inputs_filename)
+    targets_path = os.path.join(local_path, targets_filename)
+    tokenizer_path = os.path.join(local_path, tokenizer_filename)
+
+    # Save locally
+    np.save(inputs_path, inputs)# inputs
+    np.save(targets_path, targets)# inputs
+    with open(tokenizer_path, 'wb') as file: # tokenizer
+        pickle.dump(tokenizer, file)
+
+    if model_target == "gcs":
+
+        # Initialize GCP client
+        client = storage.Client()  # Access GCP
+        bucket = client.bucket(BUCKET_NAME)  # Replace with your GCP bucket name
+        print(f'Accessing GCS client at: {client} \n')
+
+        # Define the blob (path inside the bucket where the model will be stored)
+        inputs_blob = bucket.blob(f"preproc/{inputs_filename}")
+        targets_blob = bucket.blob(f"preproc/{targets_filename}") # Save inside the 'models' folder
+        tokenizer_blob = bucket.blob(f"models/{tokenizer_filename}")
+
+        # Upload the pickle file to the GCP bucket
+        inputs_blob.upload_from_filename(inputs_path)
+        targets_blob.upload_from_filename(targets_path)
+        tokenizer_blob.upload_from_filename(tokenizer_path)
+        print('Finished uploading to GCS\n')
+
+        # Delete the local model file after upload (remove from the VM)
+        os.remove(inputs_path)
+        os.remove(targets_path)
+        os.remove(tokenizer_path)
+        print('Deleted local cache\n')
+        print("✅ preprocessed data saved to gcp \n")
+
     end_time_preproc = time.time()
 
     # Train model ###################################
 
+    # assign a checkpoint path
+    checkpoint_path = f"checkpoint_{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_model.h5"
+
     if model_type == "bert":
-        # start
+
         model = set_model_bert(X= inputs, y = targets, tokenizer = tokenizer,
                   word_bucket = word_bucket,
                   gru_layer = GRU_LAYER,
                   dense_layer = DENSE_LAYER)
-        # end
-        print(f'training BERT model for class {class_code}')
 
-        model, history = fit_model_rnn(model, inputs, targets, epochs=epochs, patience = PATIENCE, batch_size=BATCH_SIZE)
+        print(f'started training BERT model for class {class_code}')
 
+        model, history = fit_model_rnn_with_checkpoint(model,
+                                                       inputs,
+                                                       targets,
+                                                       epochs=epochs,
+                                                       patience = patience,
+                                                       batch_size=BATCH_SIZE,
+                                                       save_path=checkpoint_path)
 
     if model_type == "rnn":
 
-        print(f'training RNN model for class {class_code} \n')
+        print(f'started training RNN model for class {class_code} \n')
 
         model = set_model_rnn(X= inputs, y = targets, tokenizer = tokenizer,
                   word_bucket = word_bucket,
@@ -87,58 +143,36 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
                   gru_layer = GRU_LAYER,
                   dense_layer = DENSE_LAYER)
 
-        model, history = fit_model_rnn(model, inputs, targets, epochs=epochs, patience = PATIENCE, batch_size=BATCH_SIZE)
+        model, history = fit_model_rnn_with_checkpoint(model,
+                                                       inputs,
+                                                       targets,
+                                                       epochs=epochs,
+                                                       patience = patience,
+                                                       batch_size=BATCH_SIZE,
+                                                       save_path=checkpoint_path)
 
         print(f'✅ finished training RNN model \n')
     end_time_train = time.time()
 
 
-    # Save model and tokenizer ####################################
+    # Save model  ####################################
 
     print(f'saving training RNN model for class {class_code} \n')
 
-    # Create a unique model name with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
-    inputs_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_inputs.pkl"
-    targets_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_targets.pkl"
-    model_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_model.pkl"
-    tokenizer_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_tokenizer.pkl"
+    model_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_model.h5"
     history_filename = f"{model_type}_c{class_code}_wb{word_bucket}_{timestamp}_history.pkl"
 
-    # Save a copy of the model where you are
-    # NOTE: does this need to be optimized for the VC?
-    local_path = os.getcwd()
-
     # Create the save paths
-    inputs_path = os.path.join(local_path, inputs_filename)
-    targets_path = os.path.join(local_path, targets_filename)
     model_path = os.path.join(local_path, model_filename)
-    tokenizer_path = os.path.join(local_path, tokenizer_filename)
     history_path = os.path.join(local_path, history_filename)
 
+    # Supress errors that might stop the code
     warnings.filterwarnings("ignore", category=UserWarning, module="absl")
 
-    # Save inputs preprocessed
-    with open(inputs_path, 'wb') as file:
-        pickle.dump(inputs, file)
-
-    # Save targets preprocessed
-    with open(targets_path, 'wb') as file:
-        pickle.dump(targets, file)
-
-    # Save as a tensorflow model
-    with open(model_path, 'wb') as file:
-        pickle.dump(model, file)
-
-    # Save the tokenizer as a pickle
-    with open(tokenizer_path, 'wb') as file:
-        pickle.dump(tokenizer, file)
-
-    # Save the model history
-    with open(history_filename, 'wb') as file:
+    # Save the local files
+    model.save(model_path) # Save in .h5 format
+    with open(history_filename, 'wb') as file: # Save history as a pickle
         pickle.dump(history, file)
-
 
     if model_target == "gcs":
 
@@ -146,34 +180,24 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
         client = storage.Client()  # Access GCP
 
         bucket = client.bucket(BUCKET_NAME)  # Replace with your GCP bucket name
-        print(f'Accessing client at: {client} \n')
+        print(f'Saving model at: {client} \n')
 
         # Define the blob (path inside the bucket where the model will be stored)
-        inputs_blob = bucket.blob(f"models/{inputs_filename}")
-        targets_blob = bucket.blob(f"models/{targets_filename}") # Save inside the 'models' folder
-        tokenizer_blob = bucket.blob(f"models/{tokenizer_filename}")
         model_blob = bucket.blob(f"models/{model_filename}")  # Save inside the 'models' folder
-        tokenizer_blob = bucket.blob(f"models/{tokenizer_filename}")
         history_blob = bucket.blob(f"models/{history_filename}")
 
         # Upload the pickle file to the GCP bucket
-        inputs_blob.upload_from_filename(inputs_path)
-        targets_blob.upload_from_filename(targets_path)
         model_blob.upload_from_filename(model_path)  # Upload the file to the bucket
-        tokenizer_blob.upload_from_filename(tokenizer_path)
         history_blob.upload_from_filename(history_filename)
         print('Finished uploading \n')
 
         # Delete the local model file after upload (remove from the VM)
         # NOTE: Is this step needed?
-        os.remove(inputs_path)
-        os.remove(targets_path)
         os.remove(model_path)
-        os.remove(tokenizer_path)
         os.remove(history_path)
         print('Local files deleted \n')
 
-        print(f"✅Model, tokeniser and history saved to GCP bucket \n")
+        print(f"✅Model and history saved to GCP bucket \n")
 
 
     if model_target == "local":
@@ -193,7 +217,7 @@ def model_train(model_type, class_code, model_target, word_bucket, run_type):
     elapsed_train = end_time_train - end_time_preproc
     elapsed_save = end_time_save - end_time_train
 
-    print(f'Time taken: {elapsed_time:.2f} (preproc: {elapsed_preproc:.2f}, train: {elapsed_train:.2f}, save: {elapsed_save:.2f}) ')
+    print(f'Time taken: {elapsed_time:.2f} \n preproc: {elapsed_preproc:.2f} \n train: {elapsed_train:.2f} \n save: {elapsed_save:.2f}) ')
 
 
     return None
