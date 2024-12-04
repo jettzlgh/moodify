@@ -7,9 +7,9 @@ BUCKET_NAME = 'moodify_bucket'
 DATA_BLOB_NAME = 'lyrics_with_labels.csv' #'lyrics_with_labels_50_songs.csv'
 
 # Model params
-BATCH_SIZE = 32
-EMBEDDING_DIM = 64
-GRU_LAYER = 64
-DENSE_LAYER = 64
-EPOCHS = 200
-PATIENCE = 20
+BATCH_SIZE = 256
+EMBEDDING_DIM = 32
+GRU_LAYER = 16
+DENSE_LAYER = 16
+EPOCHS = 20
+PATIENCE = 4
